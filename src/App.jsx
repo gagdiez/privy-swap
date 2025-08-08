@@ -2,12 +2,16 @@ import { Navigation } from './components/navigation';
 import Home from './pages/home';
 
 import HelloNear from './pages/hello_near';
-import { BrowserRouter, Routes, Route } from "react-router";
+import { BrowserRouter, HashRouter, Routes, Route } from "react-router";
 
 import { PrivyProvider } from '@privy-io/react-auth';
 import { NEARxPrivy } from './context/provider';
 
 function App() {
+  // Use HashRouter when deployed under a subpath (GitHub Pages)
+  const useHashRouter = import.meta.env.BASE_URL !== '/'
+  const Router = useHashRouter ? HashRouter : BrowserRouter
+
   return (
     <PrivyProvider
       appId="cme1neps40007jy0b5hyesl0s"
@@ -26,13 +30,13 @@ function App() {
       }}
     >
       <NEARxPrivy>
-        <BrowserRouter>
+        <Router>
           <Navigation />
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/hello-near" element={<HelloNear />} />
           </Routes>
-        </BrowserRouter>
+        </Router>
       </NEARxPrivy>
     </PrivyProvider>
   )

@@ -29,7 +29,7 @@ export const Navigation = () => {
       setLabel("Login");
       setBalance(null);
     }
-  }, [authenticated, privyLogin, privyLogout]);
+  }, [authenticated, privyLogin, privyLogout, user]);
 
   useEffect(() => {
     if (walletId) {

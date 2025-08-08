@@ -40,7 +40,6 @@ jobs:
           node-version: "20"
       - name: Install and test modules
         run: |
-          cd ./frontend
           yarn
           yarn next build
       - name: Upload artifact

@@ -1,5 +1,5 @@
 {
-  "name": "hello-near",
+  "name": "hello-privy",
   "private": true,
   "version": "1.0.0",
   "scripts": {
@@ -9,8 +9,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@near-js/accounts": "^2.0.0",
-    "@near-js/providers": "^2.0.0",
+    "@near-js/accounts": "^2.2.5",
+    "@near-js/providers": "^2.2.5",
     "@near-js/tokens": "^2.2.5",
     "@near-js/transactions": "^2.2.5",
     "@noble/hashes": "^1.8.0",
@@ -26,7 +26,9 @@
     "react": "^18",
     "react-dom": "^18",
     "react-router": "^7",
-    "viem": "^2.33.3"
+    "viem": "^2.33.3",
+    "vite": "^6.3.5",
+    "vite-plugin-node-polyfills": "^0.24.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
@@ -37,8 +39,6 @@
     "eslint-plugin-react": "^7.37.2",
     "eslint-plugin-react-hooks": "^5.0.0",
     "eslint-plugin-react-refresh": "^0.4.16",
-    "globals": "^15.14.0",
-    "vite": "^6.3.5",
-    "vite-plugin-node-polyfills": "^0.24.0"
+    "globals": "^15.14.0"
   }
 }

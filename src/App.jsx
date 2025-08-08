@@ -26,7 +26,7 @@ function App() {
       }}
     >
       <NEARxPrivy>
-        <BrowserRouter>
+        <BrowserRouter basename={import.meta.env.BASE_URL}>
           <Navigation />
           <Routes>
             <Route path="/" element={<Home />} />

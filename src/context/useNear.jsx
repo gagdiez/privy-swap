@@ -11,9 +11,11 @@ import { createContext } from "react";
 /** @type {import ('react').Context<NearContext>} */
 export const NearContext = createContext({
   walletId: '',
+  nearAccount: undefined,
   viewMethod: async () => { },
   callMethod: async () => { },
   getBalance: async () => { },
+  transfer: async () => { },
 });
 
 export function useNEAR() {

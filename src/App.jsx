@@ -1,7 +1,6 @@
 import { Navigation } from './components/navigation';
 import Home from './pages/home';
 
-import HelloNear from './pages/hello_near';
 import { BrowserRouter, HashRouter, Routes, Route } from "react-router";
 
 import { PrivyProvider } from '@privy-io/react-auth';
@@ -34,7 +33,6 @@ function App() {
           <Navigation />
           <Routes>
             <Route path="/" element={<Home />} />
-            <Route path="/hello-near" element={<HelloNear />} />
           </Routes>
         </Router>
       </NEARxPrivy>

@@ -14,18 +14,41 @@ import { toHex } from "viem";
 import { hexToBytes } from '@noble/hashes/utils';
 
 // config
-import { NetworkId } from '@/config';
 import { useEffect } from 'react';
 import { useCallback } from 'react';
 import { useState } from 'react';
 import { NearContext } from './useNear';
 
-const url = NetworkId === 'testnet' ? 'https://test.rpc.fastnear.com' : 'https://main.rpc.fastnear.com';
+const url = 'https://free.rpc.fastnear.com';
 const THIRTY_TGAS = '30000000000000';
 const NO_DEPOSIT = '0';
 
 // Provider
 const provider = new JsonRpcProvider({ url });
+
+class privySigner {
+  constructor(signRawHash, nearAccId) {
+    this.signRawHash = signRawHash;
+    this.nearAccId = nearAccId;
+  }
+
+  async getPublicKey() {
+    const account = new Account(this.nearAccId, provider);
+    const keys = await account.getAccessKeyList();
+    return keys.keys[0].public_key;
+  }
+
+  async signTransaction(transaction) {
+    const encoded = transaction.encode();
+    const txHash = toHex(sha256(encoded));
+    const signatureRaw = await this.signRawHash({ address: this.nearAccId, chainType: 'near', hash: txHash });
+    const signature = new Signature({
+      keyType: transaction.publicKey.keyType,
+      data: hexToBytes(signatureRaw.signature.slice(2)),
+    });
+    return [[], new SignedTransaction({ transaction, signature })];
+  }
+}
 
 // eslint-disable-next-line react/prop-types
 export function NEARxPrivy({ children }) {
@@ -41,7 +64,8 @@ export function NEARxPrivy({ children }) {
       if (!user.wallet) {
         createWallet({ chainType: 'near' });
       } else {
-        let acc = new Account(user.wallet.address, provider)
+        let signer = new privySigner(signRawHash, user.wallet.address);
+        let acc = new Account(user.wallet.address, provider, signer)
         setNearAccount(acc);
         setWalletId(user.wallet.address);
       }
@@ -49,6 +73,18 @@ export function NEARxPrivy({ children }) {
       setWalletId('');
     }
   }, [authenticated, user, createWallet]);
+
+  const transfer = useCallback(async (receiver, amount) => {
+    if (!nearAccount) {
+      throw new Error("NEAR account is not initialized. Please login first.");
+    }
+
+    const signedTx = await nearAccount.createSignedTransaction(
+      receiver,
+      [actionCreators.transfer(amount)],
+    );
+    await provider.sendTransaction(signedTx);
+  }, [nearAccount]);
 
   const viewFunction = async ({ contractId, method, args = {} }) => {
     return provider.callFunction(contractId, method, args);
@@ -59,21 +95,10 @@ export function NEARxPrivy({ children }) {
       throw new Error("NEAR account is not initialized. Please login first.");
     }
 
-    const keys = await nearAccount.getAccessKeyList()
-
-    const transaction = await nearAccount.createTransaction(
+    const signedTx = await nearAccount.createSignedTransaction(
       contractId,
       [actionCreators.functionCall(method, args, gas, deposit)],
-      keys.keys[0].public_key
     );
-    const encoded = transaction.encode();
-    const txHash = toHex(sha256(encoded));
-    const signatureRaw = await signRawHash({ address: nearAccount.accountId, chainType: 'near', hash: txHash });
-    const signature = new Signature({
-      keyType: transaction.publicKey.keyType,
-      data: hexToBytes(signatureRaw.signature.slice(2)),
-    });
-    const signedTx = new SignedTransaction({ transaction, signature })
     await provider.sendTransaction(signedTx)
   }, [nearAccount]);
 
@@ -84,7 +109,7 @@ export function NEARxPrivy({ children }) {
   }
 
   return (
-    <NearContext.Provider value={{ walletId, viewFunction, callFunction, getBalance }}>
+    <NearContext.Provider value={{ nearAccount, walletId, viewFunction, callFunction, getBalance, transfer }}>
       {children}
     </NearContext.Provider>
   )

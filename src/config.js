@@ -3,5 +3,5 @@ const contractPerNetwork = {
   testnet: 'hello.near-examples.testnet',
 };
 
-export const NetworkId = 'testnet';
+export const NetworkId = 'mainnet';
 export const HelloNearContract = contractPerNetwork[NetworkId];

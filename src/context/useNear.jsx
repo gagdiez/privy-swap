@@ -1,5 +1,5 @@
-import { useContext } from "react";
-import { createContext } from "react";
+import { useContext } from 'react'
+import { createContext } from 'react'
 
 /**
  * @typedef NearContext
@@ -12,18 +12,12 @@ import { createContext } from "react";
 export const NearContext = createContext({
   walletId: '',
   nearAccount: undefined,
-  viewMethod: async () => { },
-  callMethod: async () => { },
-  getBalance: async () => { },
-  transfer: async () => { },
-});
+})
 
 export function useNEAR() {
-  const context = useContext(NearContext);
+  const context = useContext(NearContext)
   if (!context) {
-    throw new Error(
-      "useNEAR must be used within a <NEARxPrivy> provider"
-    );
+    throw new Error('useNEAR must be used within a <NEARxPrivy> provider')
   }
-  return context;
+  return context
 }

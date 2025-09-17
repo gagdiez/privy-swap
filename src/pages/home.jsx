@@ -1,24 +1,41 @@
-import { useEffect, useState } from 'react';
+import { OpenAPI, QuoteRequest, OneClickService } from '@defuse-protocol/one-click-sdk-typescript'
 
-import styles from '@/styles/app.module.css';
+import { useEffect, useState, useCallback } from 'react'
+import { getAdapter, chains } from 'multichain.js'
+import { usePrivy } from '@privy-io/react-auth'
 
-import { useNEAR } from '../context/useNear';
-import { usePrivy } from '@privy-io/react-auth';
-import { tokens } from '../chains/tokens';
-import { fromInternalToDisplay, fromDisplayToInternal, formatDisplayAmount } from '../utils/decimals';
+import styles from '@/styles/app.module.css'
 
-import { OpenAPI, QuoteRequest, OneClickService } from '@defuse-protocol/one-click-sdk-typescript';
+import { useNEAR } from '../context/useNear'
+import { tokens } from '../tokens'
+import {
+  unitsToDecimal,
+  decimalToUnits,
+  formatNumber,
+} from '../utils/decimals'
 
-import { getAdapter } from '../chains/adapters';
-import { useCallback } from 'react';
 
-OpenAPI.BASE = 'https://1click.chaindefuser.com';
-const PATH = "predefined-path";
+OpenAPI.BASE = 'https://1click.chaindefuser.com'
 
-const getQuote = async (originAsset, originAmount, destinationAsset, refundTo, dstAccount, dry = true) => {
-  console.log("Getting quote for origin asset:", originAsset, "amount:", originAmount.toString(), "destination asset:", destinationAsset, "refund to:", refundTo, "destination account:", dstAccount);
+// Debounce hook for reducing request on user input
+function useDebouncedValue(value, delay = 400) {
+  const [debounced, setDebounced] = useState(value)
+  useEffect(() => {
+    const id = setTimeout(() => setDebounced(value), delay)
+    return () => clearTimeout(id)
+  }, [value, delay])
+  return debounced
+}
 
-  if (originAsset === destinationAsset) return;
+const getQuote = async (
+  originAsset,
+  originAmount,
+  destinationAsset,
+  refundTo,
+  dstAccount,
+  dry = true
+) => {
+  if (originAsset === destinationAsset) return { quote: { amountOut: 0 } }
 
   const quoteRequest = {
     dry: dry, // set to true for testing / false to get `depositAddress` and execute swap
@@ -32,131 +49,189 @@ const getQuote = async (originAsset, originAmount, destinationAsset, refundTo, d
     refundType: QuoteRequest.refundType.ORIGIN_CHAIN,
     recipient: dstAccount, // Valid Solana Address
     recipientType: QuoteRequest.recipientType.DESTINATION_CHAIN,
-    deadline: new Date(Date.now() + 3600 * 1000).toISOString(), // 1 hour from now 
-  };
+    deadline: new Date(Date.now() + 3600 * 1000).toISOString(), // 1 hour from now
+  }
 
-  // Get quote
-  const quote = await OneClickService.getQuote(quoteRequest);
-  return quote;
+  return OneClickService.getQuote(quoteRequest)
 }
 
-// swap interface for cross-chain transactions
 export default function Home() {
+  // Swap State
+  const [originChain, setOriginChain] = useState(chains.NEAR)
+  const [originAsset, setOriginAsset] = useState(tokens[chains.NEAR]['near'])
+  const [originAddress, setOriginAddress] = useState('loading...')
+  const [originBalance, setOriginBalance] = useState('0')
+  const [originSwapUnits, setOriginSwapUnits] = useState('0')
+  const [originSwapDecimal, setOriginSwapDecimal] = useState('0')
 
-  const [originChain, setOriginChain] = useState('near');
-  const [originAsset, setOriginAsset] = useState(tokens['near']['near']);
-  const [originAccount, setOriginAccount] = useState('loading...');
+  const [dstChain, setDstChain] = useState(chains.ARBITRUM)
+  const [dstAsset, setDstAsset] = useState(tokens[chains.ARBITRUM]['arb'])
+  const [dstAddress, setDstAddress] = useState('loading...')
+  const [dstQuota, setDstQuota] = useState('0')
 
-  const [dstChain, setDstChain] = useState('arbitrum');
-  const [dstAsset, setDstAsset] = useState(tokens['arbitrum']['arb']);
-  const [dstAccount, setDstAccount] = useState('loading...');
+  const [btnLabel, setBtnLabel] = useState('Swap Tokens')
 
-  const [btn, setBtn] = useState('Swap Tokens');
+  // Account control
+  const { authenticated } = usePrivy()
+  const { walletId, nearAccount } = useNEAR()
 
-  // Balance (what user owns)
-  const [originBalance, setOriginBalance] = useState('0');
-
-  // Input amounts (what user wants to swap)
-  const [originAmountInternal, setOriginAmountInternal] = useState('0');
-
-  // Display amounts as strings (human readable)
-  const [originAmountDisplay, setOriginAmountDisplay] = useState('0');
-  const [dstAmountDisplay, setDstAmountDisplay] = useState('0');
-
-  const { authenticated } = usePrivy();
-  const { walletId, nearAccount, viewFunction } = useNEAR();
+  // Debounced amount to throttle quote requests while typing
+  const debouncedSwapUnits = useDebouncedValue(originSwapUnits, 600)
 
   useEffect(() => {
     async function fetchOrigin() {
-      const adapter = getAdapter(originChain);
-      const { address } = await adapter.deriveAddressAndPublicKey(walletId, PATH);
-      setOriginAccount(address);
+      const adapter = getAdapter({ chain: originChain })
 
-      console.log("Getting balance for chain:", originChain, "and address:", address);
-      const { balance } = await adapter.getBalance(address, originAsset.address);
+      const address = await adapter.getAddressControlledBy({
+        nearAddress: walletId,
+      })
 
-      // Store balance separately from user input
-      const formatted = formatDisplayAmount(fromInternalToDisplay(balance, originAsset.decimals))
-      setOriginBalance(formatted.toString());
+      setOriginAddress(address)
+
+      const balance = await adapter.getBalance({
+        address,
+        tokenAddress: originAsset.address,
+      })
+
+      const formatted = formatNumber(
+        unitsToDecimal(balance, originAsset.decimals)
+      )
+      setOriginBalance(formatted.toString())
     }
 
-    setOriginAccount('loading...'); // Reset before fetching
-    setOriginBalance('loading...'); // Reset balance
-    if (authenticated && walletId) fetchOrigin();
-
-  }, [authenticated, viewFunction, originChain, walletId, originAsset]);
+    if (authenticated && walletId) fetchOrigin()
+    setOriginAddress('loading...')
+    setOriginBalance('loading...')
+  }, [authenticated, originChain, walletId, originAsset])
 
   useEffect(() => {
     async function fetchDstAddress() {
-      const adapter = getAdapter(dstChain);
-      const { address } = await adapter.deriveAddressAndPublicKey(walletId, PATH);
-      setDstAccount(address);
+      const adapter = getAdapter({ chain: dstChain })
+      const address = await adapter.getAddressControlledBy({
+        nearAddress: walletId,
+      })
+      setDstAddress(address)
     }
-    setDstAccount('loading...'); // Reset before fetching
-    if (authenticated && walletId) fetchDstAddress();
-  }, [authenticated, dstChain, walletId]);
+
+    if (authenticated && walletId) fetchDstAddress()
+    setDstAddress('loading...')
+  }, [authenticated, dstChain, walletId])
 
   useEffect(() => {
     async function fetchQuote() {
-      if (originAmountInternal === '0') return setDstAmountDisplay('0');
+      const amount = debouncedSwapUnits
+      if (!walletId) return
+      if (originAddress === 'loading...' || dstAddress === 'loading...') return
+      if (amount === '0') return setDstQuota('0')
 
-      getQuote(originAsset.id, originAmountInternal, dstAsset.id, originAccount, dstAccount)
-        .then(quote => {
-          setDstAmountDisplay(fromInternalToDisplay(quote.quote.amountOut, dstAsset.decimals));
-        }).catch((e) => { console.log(e); setDstAmountDisplay('0') });
+      getQuote(
+        originAsset.id,
+        amount,
+        dstAsset.id,
+        originAddress,
+        dstAddress
+      ).then((quote) => setDstQuota(
+        unitsToDecimal(quote.quote.amountOut, dstAsset.decimals)
+      )).catch(() => { setDstQuota('0') })
+
+      setDstQuota('loading...')
     }
 
-    setDstAmountDisplay('loading...'); // Reset destination amount
-    if (walletId) fetchQuote();
-  }, [dstChain, originAmountInternal, walletId, originAsset, dstAsset, originAccount, dstAccount]);
+    fetchQuote()
+  }, [walletId, originChain, dstChain, originAsset.id, dstAsset.id, originAddress, dstAddress, debouncedSwapUnits])
 
   const swap = useCallback(async () => {
-    if (!originAccount || !dstAccount) return;
-    setBtn('Swapping...');
+    if (!originAddress || !dstAddress) return
+    setBtnLabel('Swapping...')
     try {
-      const quote = await getQuote(originAsset.id, originAmountInternal, dstAsset.id, originAccount, dstAccount, false);
-      const depositAddress = quote.quote.depositAddress;
-      console.log("Deposit Address:", depositAddress);
+      const quote = await getQuote(
+        originAsset.id,
+        originSwapUnits,
+        dstAsset.id,
+        originAddress,
+        dstAddress,
+        false
+      )
+      const depositAddress = quote.quote.depositAddress
 
-      // Send the money!
-      const adapter = getAdapter(originChain);
-      const tx = await adapter.transfer(originAccount, depositAddress, originAmountInternal, nearAccount, originAsset.address);
-      alert(`Transaction Hash on ${originChain}: ${tx}`);
+      const adapter = getAdapter({ chain: originChain })
+      const tx = await adapter.transfer({
+        from: originAddress,
+        to: depositAddress,
+        amount: originSwapUnits,
+        nearAccount,
+        tokenAddress: originAsset.address,
+      })
+      alert(`Transaction Hash on ${originChain}: ${tx}`)
     } finally {
-      setBtn('Swap Tokens'); // Reset button text after swap
+      setBtnLabel('Swap Tokens')
     }
-  }, [originAccount, dstAccount, originAsset, originAmountInternal, dstAsset, originChain, nearAccount]);
+  }, [
+    originAddress,
+    dstAddress,
+    originAsset,
+    originSwapUnits,
+    dstAsset,
+    originChain,
+    nearAccount,
+  ])
 
   const handleAmountChange = useCallback((displayValue) => {
-    setOriginAmountDisplay(displayValue);
-    setOriginAmountInternal(fromDisplayToInternal(displayValue, originAsset.decimals));
+    setOriginSwapDecimal(displayValue);
+    setOriginSwapUnits(decimalToUnits(displayValue, originAsset.decimals));
   }, [originAsset]);
 
   const handleOriginChainChange = (newChain) => {
     // Find current asset symbol on old chain
-    const currentSymbol = Object.keys(tokens[originChain]).find(sym => tokens[originChain][sym].id === originAsset.id) || null;
+    const currentSymbol =
+      Object.keys(tokens[originChain]).find(
+        (sym) => tokens[originChain][sym].id === originAsset.id
+      ) || null
 
     // Determine new asset (keep same symbol if exists, else first available)
-    let nextAsset;
+    let nextAsset
     if (currentSymbol && tokens[newChain][currentSymbol]) {
-      nextAsset = tokens[newChain][currentSymbol];
+      nextAsset = tokens[newChain][currentSymbol]
     } else {
-      const firstSymbol = Object.keys(tokens[newChain])[0];
-      nextAsset = tokens[newChain][firstSymbol];
+      const firstSymbol = Object.keys(tokens[newChain])[0]
+      nextAsset = tokens[newChain][firstSymbol]
     }
 
-    setOriginChain(newChain);
-    setOriginAsset(nextAsset);
-    // Reset user-entered amount when switching chains (avoids mismatched decimals)
-    setOriginAmountDisplay('0');
-    setOriginAmountInternal('0');
-  };
+    setOriginChain(newChain)
+    setOriginAsset(nextAsset)
+    setOriginSwapDecimal('0')
+    setOriginSwapUnits('0')
+    setDstQuota('0') // clear stale quote
+  }
+
+  const handleDstChainChange = (newChain) => {
+    const currentSymbol =
+      Object.keys(tokens[dstChain]).find(
+        (sym) => tokens[dstChain][sym].id === dstAsset.id
+      ) || null
+    let nextAsset
+    if (currentSymbol && tokens[newChain][currentSymbol]) {
+      nextAsset = tokens[newChain][currentSymbol]
+    } else {
+      const firstSymbol = Object.keys(tokens[newChain])[0]
+      nextAsset = tokens[newChain][firstSymbol]
+    }
+    setDstChain(newChain)
+    setDstAsset(nextAsset)
+    setDstQuota('0') // clear stale quote
+  }
+
+  const readySwap =
+    authenticated &&
+    walletId &&
+    originAddress !== 'loading...' &&
+    dstAddress !== 'loading...' &&
+    parseFloat(originSwapDecimal || '0') > 0
 
   return (
     <main className={styles.main}>
       <form className={styles.form}>
         <div className={styles.swapContainer}>
-
           {/* From Card */}
           <div className={`${styles.swapCard} ${styles.from}`}>
             <div className={styles.cardHeader}>
@@ -167,7 +242,7 @@ export default function Home() {
                 <input
                   className={styles.amountInput}
                   type="text"
-                  value={originAmountDisplay || ""}
+                  value={originSwapDecimal || ''}
                   onChange={(e) => handleAmountChange(e.target.value)}
                   placeholder="0"
                 />
@@ -176,8 +251,11 @@ export default function Home() {
                   value={originAsset.id}
                   onChange={(e) => setOriginAsset(tokens[originChain][Object.keys(tokens[originChain]).find(key => tokens[originChain][key].id === e.target.value)])}
                 >
-                  {Object.keys(tokens[originChain]).map(symbol => (
-                    <option key={tokens[originChain][symbol].id} value={tokens[originChain][symbol].id}>
+                  {Object.keys(tokens[originChain]).map((symbol) => (
+                    <option
+                      key={tokens[originChain][symbol].id}
+                      value={tokens[originChain][symbol].id}
+                    >
                       {symbol.toUpperCase()}
                     </option>
                   ))}
@@ -188,7 +266,7 @@ export default function Home() {
                   value={originChain}
                   onChange={(e) => handleOriginChainChange(e.target.value)}
                 >
-                  {Object.keys(tokens).map(chain => (
+                  {Object.keys(tokens).map((chain) => (
                     <option key={chain} value={chain}>
                       {chain.charAt(0).toUpperCase() + chain.slice(1)}
                     </option>
@@ -200,7 +278,7 @@ export default function Home() {
               Balance: {originBalance}
             </span>
             <div className={styles.accountInfo}>
-              {originAccount || 'Connect wallet to see address'}
+              {originAddress || 'Connect wallet to see address'}
             </div>
           </div>
 
@@ -214,7 +292,7 @@ export default function Home() {
                 <input
                   className={styles.amountInput}
                   type="text"
-                  value={formatDisplayAmount(dstAmountDisplay) || "0"}
+                  value={formatNumber(dstQuota) || '0'}
                   disabled
                   placeholder="0"
                 />
@@ -223,8 +301,11 @@ export default function Home() {
                   value={dstAsset.id}
                   onChange={(e) => setDstAsset(tokens[dstChain][Object.keys(tokens[dstChain]).find(key => tokens[dstChain][key].id === e.target.value)])}
                 >
-                  {Object.keys(tokens[dstChain]).map(symbol => (
-                    <option key={tokens[dstChain][symbol].id} value={tokens[dstChain][symbol].id}>
+                  {Object.keys(tokens[dstChain]).map((symbol) => (
+                    <option
+                      key={tokens[dstChain][symbol].id}
+                      value={tokens[dstChain][symbol].id}
+                    >
                       {symbol.toUpperCase()}
                     </option>
                   ))}
@@ -233,9 +314,9 @@ export default function Home() {
                 <select
                   className={styles.inlineSelector}
                   value={dstChain}
-                  onChange={(e) => setDstChain(e.target.value)}
+                  onChange={(e) => handleDstChainChange(e.target.value)}
                 >
-                  {Object.keys(tokens).map(chain => (
+                  {Object.keys(tokens).map((chain) => (
                     <option key={chain} value={chain}>
                       {chain.charAt(0).toUpperCase() + chain.slice(1)}
                     </option>
@@ -244,18 +325,15 @@ export default function Home() {
               </div>
             </div>
             <div className={styles.accountInfo}>
-              {dstAccount || 'Destination address will appear here'}
+              {dstAddress || 'Destination address will appear here'}
             </div>
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={swap}
-        >
-          {btn}
+        <button type="button" onClick={swap} disabled={!readySwap || btnLabel !== 'Swap Tokens'}>
+          {btnLabel}
         </button>
       </form>
     </main>
-  );
+  )
 }

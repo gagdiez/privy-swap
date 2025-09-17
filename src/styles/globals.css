@@ -9,12 +9,12 @@
   --glass-bg: rgba(255, 255, 255, 0.1);
   --glass-border: rgba(255, 255, 255, 0.2);
   --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
-  
+
   /* Gradient backgrounds */
   --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   --secondary-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
   --accent-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-  
+
   --foreground-rgb: 255, 255, 255;
   --background-start-rgb: 102, 126, 234;
   --background-end-rgb: 118, 75, 162;
@@ -27,11 +27,21 @@
     #4facfe33 160deg,
     transparent 360deg
   );
-  --secondary-glow: radial-gradient(rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0));
+  --secondary-glow: radial-gradient(
+    rgba(255, 255, 255, 0.1),
+    rgba(255, 255, 255, 0)
+  );
 
   --tile-start-rgb: 239, 245, 249;
   --tile-end-rgb: 228, 232, 233;
-  --tile-border: conic-gradient(#ffffff30, #ffffff20, #ffffff10, #ffffff10, #ffffff20, #ffffff30);
+  --tile-border: conic-gradient(
+    #ffffff30,
+    #ffffff20,
+    #ffffff10,
+    #ffffff10,
+    #ffffff20,
+    #ffffff30
+  );
 
   --callout-rgb: 255, 255, 255;
   --callout-border-rgb: 255, 255, 255;
@@ -44,17 +54,32 @@
     --glass-bg: rgba(0, 0, 0, 0.2);
     --glass-border: rgba(255, 255, 255, 0.1);
     --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-    
+
     --foreground-rgb: 255, 255, 255;
     --background-start-rgb: 13, 13, 13;
     --background-end-rgb: 30, 30, 30;
 
-    --primary-glow: radial-gradient(rgba(102, 126, 234, 0.4), rgba(102, 126, 234, 0));
-    --secondary-glow: linear-gradient(to bottom right, rgba(102, 126, 234, 0), rgba(102, 126, 234, 0), rgba(102, 126, 234, 0.3));
+    --primary-glow: radial-gradient(
+      rgba(102, 126, 234, 0.4),
+      rgba(102, 126, 234, 0)
+    );
+    --secondary-glow: linear-gradient(
+      to bottom right,
+      rgba(102, 126, 234, 0),
+      rgba(102, 126, 234, 0),
+      rgba(102, 126, 234, 0.3)
+    );
 
     --tile-start-rgb: 2, 13, 46;
     --tile-end-rgb: 2, 5, 19;
-    --tile-border: conic-gradient(#ffffff30, #ffffff20, #ffffff10, #ffffff10, #ffffff20, #ffffff30);
+    --tile-border: conic-gradient(
+      #ffffff30,
+      #ffffff20,
+      #ffffff10,
+      #ffffff10,
+      #ffffff20,
+      #ffffff30
+    );
 
     --callout-rgb: 255, 255, 255;
     --callout-border-rgb: 255, 255, 255;
